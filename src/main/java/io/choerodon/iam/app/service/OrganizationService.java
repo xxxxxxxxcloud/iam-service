@@ -9,6 +9,8 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
  */
 public interface OrganizationService {
 
+    OrganizationDTO createOrganization(OrganizationDTO organizationDTO);
+
     OrganizationDTO updateOrganization(Long organizationId, OrganizationDTO organizationDTO);
 
     OrganizationDTO queryOrganizationById(Long organizationId);

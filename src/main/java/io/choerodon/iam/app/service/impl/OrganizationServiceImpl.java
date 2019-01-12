@@ -2,10 +2,12 @@ package io.choerodon.iam.app.service.impl;
 
 import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.ORG_DISABLE;
 import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.ORG_ENABLE;
+import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.TASK_ORG_CREATE;
 
 import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.choerodon.iam.domain.iam.entity.OrganizationE;
 import io.choerodon.iam.domain.iam.entity.UserE;
 import io.choerodon.iam.domain.repository.UserRepository;
 import io.choerodon.iam.domain.service.IUserService;
@@ -76,6 +78,14 @@ public class OrganizationServiceImpl implements OrganizationService {
         this.userRepository = userRepository;
         this.iUserService = iUserService;
         this.asgardFeignClient = asgardFeignClient;
+    }
+
+    @Override
+    @Saga(code = TASK_ORG_CREATE, description = "iam创建组织", inputSchemaClass = OrganizationEventPayload.class)
+    public OrganizationDTO createOrganization(OrganizationDTO organizationDTO) {
+        OrganizationE organization = ConvertHelper.convert(organizationDTO, OrganizationE.class);
+        organization = organizationRepository.create(organization);
+        return ConvertHelper.convert(organization, OrganizationDTO.class);
     }
 
     @Override

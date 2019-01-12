@@ -1,6 +1,7 @@
 package io.choerodon.iam.api.dto;
 
 import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Size;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -32,7 +33,10 @@ public class UserDTO {
     private String organizationName;
 
     @ApiModelProperty(value = "登录名/必填")
-    @Pattern(regexp = LOGIN_NAME_REG, message = "error.user.loginName.regex")
+    @Pattern(regexp = EMAIL_REG, message = "error.user.loginName.regex",
+            groups = {UserValidator.UserGroup.class, UserValidator.UserInfoGroup.class})
+    @NotEmpty(message = "error.user.login_name.empty", groups = UserValidator.UserGroup.class)
+    @Size(min = 1, max = 128, message = "error.user.login_name.size", groups = UserValidator.UserGroup.class)
     private String loginName;
 
     @ApiModelProperty(value = "邮箱/必填")

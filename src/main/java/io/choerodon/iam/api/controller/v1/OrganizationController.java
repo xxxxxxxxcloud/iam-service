@@ -35,6 +35,19 @@ public class OrganizationController extends BaseController {
     }
 
     /**
+     * 创建组织信息
+     *
+     * @return 创建成功后的组织信息
+     */
+    @Permission(level = ResourceLevel.SITE)
+    @ApiOperation(value = "创建组织")
+    @PostMapping
+    public ResponseEntity<OrganizationDTO> create(@RequestBody @Valid OrganizationDTO organizationDTO) {
+        return new ResponseEntity<>(organizationService.createOrganization(organizationDTO),
+                HttpStatus.OK);
+    }
+
+    /**
      * 修改组织信息
      *
      * @return 修改成功后的组织信息
