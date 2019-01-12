@@ -7,6 +7,7 @@ import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.TASK_OR
 import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.choerodon.iam.api.dto.payload.OrganizationCreateEventPayload;
 import io.choerodon.iam.domain.iam.entity.OrganizationE;
 import io.choerodon.iam.domain.iam.entity.UserE;
 import io.choerodon.iam.domain.repository.UserRepository;
@@ -81,10 +82,22 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
     @Override
-    @Saga(code = TASK_ORG_CREATE, description = "iam创建组织", inputSchemaClass = OrganizationEventPayload.class)
+    @Saga(code = TASK_ORG_CREATE, description = "iam创建组织", inputSchemaClass = OrganizationCreateEventPayload.class)
     public OrganizationDTO createOrganization(OrganizationDTO organizationDTO) {
         OrganizationE organization = ConvertHelper.convert(organizationDTO, OrganizationE.class);
         organization = organizationRepository.create(organization);
+
+        OrganizationCreateEventPayload payload = new OrganizationCreateEventPayload();
+        payload.setCode(organizationDTO.getCode());
+        payload.setId(organizationDTO.getId());
+        payload.setName(organizationDTO.getName());
+
+        try {
+            String input = mapper.writeValueAsString(payload);
+            sagaClient.startSaga("org-create-organization", new StartInstanceDTO(input, "", organization.getId() + ""));
+        } catch (Exception e) {
+            throw new CommonException("error.organizationService.enableOrDisable.event", e);
+        }
         return ConvertHelper.convert(organization, OrganizationDTO.class);
     }
 
