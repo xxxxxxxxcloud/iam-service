@@ -89,8 +89,10 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         OrganizationCreateEventPayload payload = new OrganizationCreateEventPayload();
         payload.setCode(organizationDTO.getCode());
-        payload.setId(organizationDTO.getId());
+        payload.setId(organization.getId());
         payload.setName(organizationDTO.getName());
+        CustomUserDetails cud = DetailsHelper.getUserDetails();
+        payload.setUserId(cud.getUserId());
 
         try {
             String input = mapper.writeValueAsString(payload);
