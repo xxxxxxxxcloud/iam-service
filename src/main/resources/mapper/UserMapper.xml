@@ -16,6 +16,8 @@
             <result property="enabled" column="role_is_enabled"/>
             <result property="builtIn" column="role_is_built_in"/>
         </collection>
+        <result property="organizationId" column="organization_id"/>
+        <result property="organizationName" column="organization_name"/>
     </resultMap>
 
     <resultMap id="userDO" type="io.choerodon.iam.infra.dataobject.UserDO">
