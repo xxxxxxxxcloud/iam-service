@@ -23,6 +23,7 @@ public class UserDO extends AuditDomain {
     private String loginName;
     private String email;
     private Long organizationId;
+    @Transient
     private String organizationName;
     @Transient
     private String originalPassword;
