@@ -392,7 +392,7 @@ public class UserServiceImpl implements UserService {
     private void checkLoginName(UserDTO user) {
         Boolean createCheck = StringUtils.isEmpty(user.getId());
         String loginName = user.getLoginName();
-        if (!Pattern.matches(UserDTO.LOGIN_NAME_REG, loginName)) {
+        if (!Pattern.matches(UserDTO.EMAIL_REG, loginName)) {
             throw new CommonException("error.user.loginName.regex");
         }
         UserDO userDO = new UserDO();

@@ -503,10 +503,10 @@ public class ExcelImportUserTask {
             BeanUtils.copyProperties(user, errorUser);
             errorUser.setCause("登录名或邮箱为空");
             errorUsers.add(errorUser);
-        } else if (!Pattern.matches(UserDTO.LOGIN_NAME_REG, loginName)) {
+        } else if (!Pattern.matches(UserDTO.EMAIL_REG, loginName)) {
             ErrorUserDTO errorUser = new ErrorUserDTO();
             BeanUtils.copyProperties(user, errorUser);
-            errorUser.setCause("登录名只能使用字母和数字，长度在1-128位之间");
+            errorUser.setCause("登录名必须为邮箱格式");
             errorUsers.add(errorUser);
         } else if (!Pattern.matches(UserDTO.EMAIL_REG, email)) {
             ErrorUserDTO errorUser = new ErrorUserDTO();
