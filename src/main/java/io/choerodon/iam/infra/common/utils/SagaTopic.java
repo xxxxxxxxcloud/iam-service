@@ -11,7 +11,7 @@ public final class SagaTopic {
 
         //创建用户
         public static final String USER_CREATE = "iam-create-user";
-        //iam接收创建组织事件的SagaTaskCode
+        //iam接收创建用户事件的SagaTaskCode
         public static final String TASK_USER_CREATE = "task-create-user";
         //批量创建用户
         public static final String USER_CREATE_BATCH = "iam-create-user";
@@ -23,6 +23,10 @@ public final class SagaTopic {
         public static final String USER_ENABLE = "iam-enable-user";
         //停用用户
         public static final String USER_DISABLE = "iam-disable-user";
+        //iam接收修改密码事件的SagaTaskCode
+        public static final String TASK_UPDATE_PASSWORD = "task-update-password";
+        //修改密码
+        public static final String USER_UPDATE_PASSWORD = "iam-update-password";
     }
 
     public static class Project {

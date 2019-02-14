@@ -1,6 +1,8 @@
 package io.choerodon.iam.app.service.impl;
 
+import static io.choerodon.iam.infra.common.utils.SagaTopic.User.USER_CREATE;
 import static io.choerodon.iam.infra.common.utils.SagaTopic.User.USER_UPDATE;
+import static io.choerodon.iam.infra.common.utils.SagaTopic.User.USER_UPDATE_PASSWORD;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -10,6 +12,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.choerodon.asgard.saga.annotation.Saga;
 import net.coobird.thumbnailator.Thumbnails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -283,7 +286,9 @@ public class UserServiceImpl implements UserService {
         return resultOrganizations;
     }
 
+    @Transactional(rollbackFor = CommonException.class)
     @Override
+    @Saga(code = USER_UPDATE_PASSWORD, description = "iam用户修改密码", inputSchemaClass = UserEventPayload.class)
     public void selfUpdatePassword(Long userId, UserPasswordDTO userPasswordDTO, Boolean checkPassword) {
         checkLoginUser(userId);
         UserE user = userRepository.selectByPrimaryKey(userId);
@@ -311,13 +316,20 @@ public class UserServiceImpl implements UserService {
         userRepository.updateSelective(user);
         passwordRecord.updatePassword(user.getId(), user.getPassword());
 
-        // send siteMsg
-        //this.sendSiteMsg(user.getId(), user.getRealName());
-        Map<String, Object> paramsMap = new HashMap<>();
-        paramsMap.put("userName", user.getRealName());
-        List<Long> userIds = new ArrayList<>();
-        userIds.add(user.getId());
-        iUserService.sendNotice(user.getId(), userIds, "modifyPassword", paramsMap, 0L);
+        if (devopsMessage) {
+            try {
+                UserEventPayload userEventPayload = new UserEventPayload();
+                userEventPayload.setId(userId.toString());
+                userEventPayload.setFromUserId(userId);
+                userEventPayload.setName(user.getRealName());
+                userEventPayload.setPassword(userPasswordDTO.getPassword());
+                //devop处理接受的是list
+                String input = mapper.writeValueAsString(userEventPayload);
+                sagaClient.startSaga(USER_UPDATE_PASSWORD, new StartInstanceDTO(input, "user", userEventPayload.getId()));
+            } catch (Exception e) {
+                throw new CommonException("error.organizationUserService.updatePassword.event", e);
+            }
+        }
     }
 
     @Override

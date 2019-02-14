@@ -476,6 +476,7 @@ public class ExcelImportUserTask {
                 user.setPassword("abcd1234");
             }
             //加密
+            user.setPlainPassword(user.getPassword());
             user.setPassword(ENCODER.encode(user.getPassword()));
             if (StringUtils.isEmpty(user.getLanguage())) {
                 user.setLanguage("zh_CN");
