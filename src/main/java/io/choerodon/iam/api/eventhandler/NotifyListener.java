@@ -16,8 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static io.choerodon.iam.infra.common.utils.SagaTopic.User.TASK_USER_CREATE;
-import static io.choerodon.iam.infra.common.utils.SagaTopic.User.USER_CREATE;
+import static io.choerodon.iam.infra.common.utils.SagaTopic.User.*;
 
 /**
  * @author dengyouquan
@@ -53,5 +52,22 @@ public class NotifyListener {
         iUserService.sendNotice(payload.getFromUserId(), userIds, ADD_USER, paramsMap, payload.getOrganizationId());
         LOGGER.info("NotifyListener create user send station letter.");
         return payloads;
+    }
+
+    @SagaTask(code = TASK_UPDATE_PASSWORD, sagaCode = USER_UPDATE_PASSWORD, seq = 1, description = "修改密码成功后发送站内信事件")
+    public UserEventPayload updatePassword(String message) throws IOException {
+        UserEventPayload payload = mapper.readValue(message, UserEventPayload.class);
+        if (payload == null) {
+            throw new CommonException("error.sagaTask.sendPm.payloadIsNull");
+        }
+        //发送通知
+        Map<String, Object> paramsMap = new HashMap<>();
+        paramsMap.put("userName", payload.getName());
+        List<Long> userIds = new ArrayList<>();
+        userIds.add(payload.getFromUserId());
+        //发送的人和接受站内信的人是同一个人
+        iUserService.sendNotice(payload.getFromUserId(), userIds, "modifyPassword", paramsMap, 0L);
+        LOGGER.info("NotifyListener update password send station letter.");
+        return payload;
     }
 }

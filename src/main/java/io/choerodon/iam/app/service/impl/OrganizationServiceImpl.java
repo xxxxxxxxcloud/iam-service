@@ -15,6 +15,7 @@ import io.choerodon.iam.domain.service.IUserService;
 import io.choerodon.iam.infra.feign.AsgardFeignClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import io.choerodon.asgard.saga.annotation.Saga;
@@ -81,6 +82,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         this.asgardFeignClient = asgardFeignClient;
     }
 
+    @Transactional(rollbackFor = CommonException.class)
     @Override
     @Saga(code = TASK_ORG_CREATE, description = "iam创建组织", inputSchemaClass = OrganizationCreateEventPayload.class)
     public OrganizationDTO createOrganization(OrganizationDTO organizationDTO) {

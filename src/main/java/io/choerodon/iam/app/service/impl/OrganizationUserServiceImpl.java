@@ -98,6 +98,7 @@ public class OrganizationUserServiceImpl implements OrganizationUserService {
                 userEventPayload.setId(user.getId().toString());
                 userEventPayload.setName(user.getRealName());
                 userEventPayload.setUsername(user.getLoginName());
+                userEventPayload.setPassword(password);
                 userEventPayload.setFromUserId(DetailsHelper.getUserDetails().getUserId());
                 userEventPayload.setOrganizationId(organizationId);
                 //devop处理接受的是list
@@ -126,6 +127,7 @@ public class OrganizationUserServiceImpl implements OrganizationUserService {
                     payload.setId(user.getId().toString());
                     payload.setName(user.getRealName());
                     payload.setUsername(user.getLoginName());
+                    payload.setPassword(user.getPlainPassword());
                     payloads.add(payload);
                 }
             });
