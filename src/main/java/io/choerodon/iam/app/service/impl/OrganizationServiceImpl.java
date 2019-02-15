@@ -1,9 +1,5 @@
 package io.choerodon.iam.app.service.impl;
 
-import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.ORG_DISABLE;
-import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.ORG_ENABLE;
-import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.TASK_ORG_CREATE;
-
 import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +10,7 @@ import io.choerodon.iam.domain.service.IUserService;
 import io.choerodon.iam.infra.feign.AsgardFeignClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import io.choerodon.asgard.saga.annotation.Saga;
@@ -37,6 +34,8 @@ import io.choerodon.iam.infra.dataobject.OrganizationDO;
 import io.choerodon.iam.infra.dataobject.ProjectDO;
 import io.choerodon.iam.infra.dataobject.RoleDO;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
+
+import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.*;
 
 /**
  * @author wuguokai
@@ -80,8 +79,9 @@ public class OrganizationServiceImpl implements OrganizationService {
         this.asgardFeignClient = asgardFeignClient;
     }
 
+    @Transactional(rollbackFor = CommonException.class)
     @Override
-    @Saga(code = TASK_ORG_CREATE, description = "iam创建组织", inputSchemaClass = OrganizationEventPayload.class)
+    @Saga(code = ORG_CREATE, description = "iam创建组织", inputSchemaClass = OrganizationEventPayload.class)
     public OrganizationDTO createOrganization(OrganizationDTO organizationDTO) {
         OrganizationE organization = ConvertHelper.convert(organizationDTO, OrganizationE.class);
         organization = organizationRepository.create(organization);
