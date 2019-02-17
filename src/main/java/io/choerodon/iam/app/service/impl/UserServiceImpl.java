@@ -298,6 +298,9 @@ public class UserServiceImpl implements UserService {
         if (!user.comparePassword(userPasswordDTO.getOriginalPassword())) {
             throw new CommonException("error.password.originalPassword");
         }
+        if (userPasswordDTO.getPassword() == null || userPasswordDTO.getPassword().length() < 8) {
+            throw new CommonException("error.minLength");
+        }
         //密码策略
         if (checkPassword) {
             BaseUserDO baseUserDO = new BaseUserDO();
@@ -579,6 +582,9 @@ public class UserServiceImpl implements UserService {
         String password = user.getPassword();
         if (StringUtils.isEmpty(password)) {
             throw new CommonException("error.user.password.empty");
+        }
+        if (password.length() < 8) {
+            throw new CommonException("error.minLength");
         }
         Long organizationId = user.getOrganizationId();
         BaseUserDO userDO = new BaseUserDO();

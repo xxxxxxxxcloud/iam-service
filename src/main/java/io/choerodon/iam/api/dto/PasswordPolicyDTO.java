@@ -29,7 +29,7 @@ public class PasswordPolicyDTO {
     private String originalPassword;
 
     @ApiModelProperty(value = "最小密码长度/非必填")
-    @Range(min = 0, message = "error.minLength")
+    @Range(min = 8, message = "error.minLength")
     private Integer minLength;
 
     @ApiModelProperty(value = "最大密码长度/非必填")

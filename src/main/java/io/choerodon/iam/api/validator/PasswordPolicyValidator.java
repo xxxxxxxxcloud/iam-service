@@ -38,6 +38,10 @@ public class PasswordPolicyValidator {
             throw new CommonException("error.passwordPolicy.organizationId.not.same");
         }
 
+        if (passwordPolicyDTO.getMinLength() < 8) {
+            throw new CommonException("error.minLength");
+        }
+
         // the sum of all the fields with least length requirement is greater than maxLength
         int allLeastRequiredLength = passwordPolicyDTO.getDigitsCount() +
                 passwordPolicyDTO.getSpecialCharCount() +

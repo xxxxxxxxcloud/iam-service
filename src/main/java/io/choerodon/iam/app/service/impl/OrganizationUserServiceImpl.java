@@ -80,6 +80,9 @@ public class OrganizationUserServiceImpl implements OrganizationUserService {
         String password =
                 Optional.ofNullable(userDTO.getPassword())
                         .orElseThrow(() -> new CommonException("error.user.password.empty"));
+        if (password.length() < 8) {
+            throw new CommonException("error.minLength");
+        }
         OrganizationDO organizationDO =
                 Optional.ofNullable(organizationRepository.selectByPrimaryKey(userDTO.getOrganizationId()))
                         .orElseThrow(() -> new CommonException(ORGANIZATION_NOT_EXIST_EXCEPTION));

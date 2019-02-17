@@ -90,6 +90,8 @@ public class OrganizationListener {
             passwordPolicyDTO.setEnableLock(true);
             passwordPolicyDTO.setMaxErrorTime(5);
             passwordPolicyDTO.setLockedExpireTime(600);
+            passwordPolicyDTO.setMinLength(8);
+            passwordPolicyDTO.setMaxLength(128);
             passwordPolicyService.create(orgId, passwordPolicyDTO);
         } catch (Exception e) {
             LOGGER.error("create password policy error of organizationId: {}, exception: {}", orgId, e);
