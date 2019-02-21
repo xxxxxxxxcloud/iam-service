@@ -7,7 +7,7 @@ stages:
 maven-test-branches:
   stage: mvn-package
   script:
-    - git_merge master
+    - git_merge x-master
     - mvn package -U -DskipTests=true -Dmaven.test.skip=true
   only:
     - branches
@@ -15,7 +15,7 @@ maven-test-branches:
     - x-master
     - x-tags
     - x-develop
-    - /^x-release-.*$/
+    - /^x-feature-.*$/
     - /^x-hotfix-.*$/
 
 maven-test-build:
@@ -30,7 +30,7 @@ maven-test-build:
     - x-master
     - x-tags
     - x-develop
-    - /^x-release-.*$/
+    - /^x-feature-.*$/
     - /^x-hotfix-.*$/
 
 docker-build:
@@ -42,7 +42,7 @@ docker-build:
     - x-master
     - x-tags
     - x-develop
-    - /^x-release-.*$/
+    - /^x-feature-.*$/
     - /^x-hotfix-.*$/
 
 .auto_devops: &auto_devops |
