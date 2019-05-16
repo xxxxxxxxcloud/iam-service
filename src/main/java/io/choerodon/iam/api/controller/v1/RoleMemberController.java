@@ -35,6 +35,7 @@ import java.util.List;
 @RequestMapping(value = "/v1")
 public class RoleMemberController extends BaseController {
 
+    public static final String MEMBER_ROLE = "member-role";
     private RoleMemberService roleMemberService;
 
     private UserService userService;
@@ -164,9 +165,10 @@ public class RoleMemberController extends BaseController {
             @ApiIgnore
             @SortDefault(value = "id", direction = Sort.Direction.ASC) PageRequest pageRequest,
             @RequestParam(name = "role_id") Long roleId,
-            @RequestBody(required = false) @Valid RoleAssignmentSearchDTO roleAssignmentSearchDTO) {
+            @RequestBody(required = false) @Valid RoleAssignmentSearchDTO roleAssignmentSearchDTO,
+            @RequestParam(defaultValue = "true") boolean doPage) {
         return new ResponseEntity<>(userService.pagingQueryUsersByRoleIdOnSiteLevel(
-                pageRequest, roleAssignmentSearchDTO, roleId), HttpStatus.OK);
+                pageRequest, roleAssignmentSearchDTO, roleId, doPage), HttpStatus.OK);
     }
 
     /**
@@ -193,9 +195,10 @@ public class RoleMemberController extends BaseController {
             @SortDefault(value = "id", direction = Sort.Direction.ASC) PageRequest pageRequest,
             @RequestParam(name = "role_id") Long roleId,
             @PathVariable(name = "organization_id") Long sourceId,
-            @RequestBody(required = false) @Valid RoleAssignmentSearchDTO roleAssignmentSearchDTO) {
+            @RequestBody(required = false) @Valid RoleAssignmentSearchDTO roleAssignmentSearchDTO,
+            @RequestParam(defaultValue = "true") boolean doPage) {
         return new ResponseEntity<>(userService.pagingQueryUsersByRoleIdOnOrganizationLevel(
-                pageRequest, roleAssignmentSearchDTO, roleId, sourceId), HttpStatus.OK);
+                pageRequest, roleAssignmentSearchDTO, roleId, sourceId, doPage), HttpStatus.OK);
     }
 
     @Permission(level = ResourceLevel.ORGANIZATION)
@@ -272,6 +275,23 @@ public class RoleMemberController extends BaseController {
     public ResponseEntity<List<RoleDTO>> listRolesWithClientCountOnSiteLevel(
             @RequestBody(required = false) @Valid ClientRoleSearchDTO clientRoleSearchDTO) {
         return new ResponseEntity<>(roleService.listRolesWithClientCountOnSiteLevel(clientRoleSearchDTO), HttpStatus.OK);
+    }
+
+    /**
+     * 分页查询site层有角色的用户
+     *
+     * @return 查询结果
+     */
+    @Permission(level = ResourceLevel.SITE)
+    @ApiOperation(value = "全局层分页查询site层有角色的用户")
+    @GetMapping(value = "/site/role_members/users")
+    public ResponseEntity<Page<UserDTO>> pagingQueryUsersOnSiteLevel(@ApiIgnore
+                                                                     @SortDefault(value = "id", direction = Sort.Direction.ASC)
+                                                                             PageRequest pageRequest,
+                                                                     @RequestParam(required = false, name = "id") Long userId,
+                                                                     @RequestParam(required = false) String email,
+                                                                     @RequestParam(required = false) String param) {
+        return new ResponseEntity<>(userService.pagingQueryUsersOnSiteLevel(userId, email, pageRequest, param), HttpStatus.OK);
     }
 
     /**
@@ -535,7 +555,7 @@ public class RoleMemberController extends BaseController {
     @ApiOperation("查site层的历史")
     @GetMapping("/site/member_role/users/{user_id}/upload/history")
     public ResponseEntity latestHistoryOnSite(@PathVariable(name = "user_id") Long userId) {
-        return new ResponseEntity<>(uploadHistoryService.latestHistory(userId, "member-role", 0L, ResourceLevel.SITE.value()), HttpStatus.OK);
+        return new ResponseEntity<>(uploadHistoryService.latestHistory(userId, MEMBER_ROLE, 0L, ResourceLevel.SITE.value()), HttpStatus.OK);
     }
 
     @Permission(level = ResourceLevel.ORGANIZATION)
@@ -543,7 +563,7 @@ public class RoleMemberController extends BaseController {
     @GetMapping("/organizations/{organization_id}/member_role/users/{user_id}/upload/history")
     public ResponseEntity latestHistoryOnOrganization(@PathVariable(name = "organization_id") Long organizationId,
                                                       @PathVariable(name = "user_id") Long userId) {
-        return new ResponseEntity<>(uploadHistoryService.latestHistory(userId, "member-role", organizationId, ResourceLevel.ORGANIZATION.value()), HttpStatus.OK);
+        return new ResponseEntity<>(uploadHistoryService.latestHistory(userId, MEMBER_ROLE, organizationId, ResourceLevel.ORGANIZATION.value()), HttpStatus.OK);
     }
 
     @Permission(level = ResourceLevel.PROJECT, roles = InitRoleCode.PROJECT_OWNER)
@@ -551,7 +571,7 @@ public class RoleMemberController extends BaseController {
     @GetMapping("/projects/{project_id}/member_role/users/{user_id}/upload/history")
     public ResponseEntity latestHistoryOnProject(@PathVariable(name = "project_id") Long projectId,
                                                  @PathVariable(name = "user_id") Long userId) {
-        return new ResponseEntity<>(uploadHistoryService.latestHistory(userId, "member-role", projectId, ResourceLevel.PROJECT.value()), HttpStatus.OK);
+        return new ResponseEntity<>(uploadHistoryService.latestHistory(userId, MEMBER_ROLE, projectId, ResourceLevel.PROJECT.value()), HttpStatus.OK);
     }
 
     @Permission(permissionPublic = true)

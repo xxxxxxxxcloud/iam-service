@@ -47,6 +47,10 @@ public interface UserRepository {
 
     Page<UserDO> pagingQueryUsersByProjectId(Long projectId, Long userId, String email, PageRequest pageRequest, String param);
 
+    Page<UserDO> pagingQueryUsersByOrganizationId(Long organizationId, Long userId, String email, PageRequest pageRequest, String param);
+
+    Page<UserDO> pagingQueryUsersOnSiteLevel(Long userId, String email, PageRequest pageRequest, String param);
+
     Integer selectUserCountFromMemberRoleByOptions(Long roleId, String memberType, Long sourceId,
                                                    String sourceType, RoleAssignmentSearchDTO roleAssignmentSearchDTO,
                                                    String param);
@@ -65,10 +69,19 @@ public interface UserRepository {
     /**
      * 根据用户id集合查询用户的集合
      *
-     * @param ids 用户id数组
+     * @param ids         用户id数组
+     * @param onlyEnabled 是否只查询启用的用户
      * @return List<UserDO> 用户集合
      */
-    List<UserDO> listUsersByIds(Long[] ids);
+    List<UserDO> listUsersByIds(Long[] ids, Boolean onlyEnabled);
+
+    /**
+     * 根据用户emails集合查询用户的集合
+     *
+     * @param emails 用户email数组
+     * @return List<UserDO> 用户集合
+     */
+    List<UserDO> listUsersByEmails(String[] emails);
 
     Page<UserDO> pagingQueryAdminUsers(PageRequest pageRequest, UserDO userDO, String params);
 

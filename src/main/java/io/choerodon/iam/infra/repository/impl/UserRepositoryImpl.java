@@ -26,6 +26,7 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 @Component
 public class UserRepositoryImpl implements UserRepository {
 
+    public static final String ERROR_USER_UPDATE = "error.user.update";
     private UserMapper mapper;
 
     public UserRepositoryImpl(UserMapper mapper) {
@@ -63,7 +64,7 @@ public class UserRepositoryImpl implements UserRepository {
         UserDO userDO = mapper.selectByPrimaryKey(userId);
         userDO.setImageUrl(photoUrl);
         if (mapper.updateByPrimaryKeySelective(userDO) != 1) {
-            throw new CommonException("error.user.update");
+            throw new CommonException(ERROR_USER_UPDATE);
         }
     }
 
@@ -74,7 +75,7 @@ public class UserRepositoryImpl implements UserRepository {
             throw new CommonException("error.user.objectVersionNumber.empty");
         }
         if (mapper.updateByPrimaryKeySelective(userDO) != 1) {
-            throw new CommonException("error.user.update");
+            throw new CommonException(ERROR_USER_UPDATE);
         }
         return ConvertHelper.convert(mapper.selectByPrimaryKey(userDO.getId()), UserE.class);
     }
@@ -84,7 +85,7 @@ public class UserRepositoryImpl implements UserRepository {
         UserDO userDO = new UserDO();
         userDO.setId(id);
         if (mapper.deleteByPrimaryKey(userDO) != 1) {
-            throw new CommonException("error.user.delete");
+            throw new CommonException(ERROR_USER_UPDATE);
         }
     }
 
@@ -157,7 +158,7 @@ public class UserRepositoryImpl implements UserRepository {
             List<UserDO> users =
                     mapper.selectUserWithRolesByOption(roleAssignmentSearchDTO, sourceId, ResourceLevel.PROJECT.value(), null, null,
                             ParamUtils.arrToStr(roleAssignmentSearchDTO.getParam()));
-            PageInfo pageInfo = new PageInfo(0, users.size() == 0 ? 1 : users.size());
+            PageInfo pageInfo = new PageInfo(0, users.isEmpty() ? 1 : users.size());
             return new Page<>(users, pageInfo, users.size());
         }
     }
@@ -179,7 +180,19 @@ public class UserRepositoryImpl implements UserRepository {
     @Override
     public Page<UserDO> pagingQueryUsersByProjectId(Long projectId, Long userId, String email, PageRequest pageRequest, String param) {
         return PageHelper.doPageAndSort(pageRequest,
-                () -> mapper.selectUsersByProjectIdAndOptions(projectId, userId, email, param));
+                () -> mapper.selectUsersByLevelAndOptions(ResourceLevel.PROJECT.value(), projectId, userId, email, param));
+    }
+
+    @Override
+    public Page<UserDO> pagingQueryUsersByOrganizationId(Long organizationId, Long userId, String email, PageRequest pageRequest, String param) {
+        return PageHelper.doPageAndSort(pageRequest,
+                () -> mapper.selectUsersByLevelAndOptions(ResourceLevel.ORGANIZATION.value(), organizationId, userId, email, param));
+    }
+
+    @Override
+    public Page<UserDO> pagingQueryUsersOnSiteLevel(Long userId, String email, PageRequest pageRequest, String param) {
+        return PageHelper.doPageAndSort(pageRequest,
+                () -> mapper.selectUsersByLevelAndOptions(ResourceLevel.SITE.value(), 0L, userId, email, param));
     }
 
     @Override
@@ -214,7 +227,7 @@ public class UserRepositoryImpl implements UserRepository {
             List<UserDO> users =
                     mapper.selectUsersFromMemberRoleByOptions(roleId, "user", sourceId,
                             level, roleAssignmentSearchDTO, param);
-            PageInfo pageInfo = new PageInfo(0, users.size() == 0 ? 1 : users.size());
+            PageInfo pageInfo = new PageInfo(0, users.isEmpty() ? 1 : users.size());
             return new Page<>(users, pageInfo, users.size());
         }
         Map<String, String> map = new HashMap<>();
@@ -264,8 +277,13 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
-    public List<UserDO> listUsersByIds(Long[] ids) {
-        return mapper.listUsersByIds(ids);
+    public List<UserDO> listUsersByIds(Long[] ids, Boolean onlyEnabled) {
+        return mapper.listUsersByIds(ids, onlyEnabled);
+    }
+
+    @Override
+    public List<UserDO> listUsersByEmails(String[] emails) {
+        return mapper.listUsersByEmails(emails);
     }
 
     @Override

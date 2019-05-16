@@ -9,6 +9,7 @@ import io.choerodon.iam.api.dto.SystemSettingDTO;
 import io.choerodon.iam.api.dto.payload.SystemSettingEventPayload;
 import io.choerodon.iam.app.service.SystemSettingService;
 import io.choerodon.iam.domain.repository.SystemSettingRepository;
+import io.choerodon.iam.infra.common.utils.ImageUtils;
 import io.choerodon.iam.infra.common.utils.MockMultipartFile;
 import io.choerodon.iam.infra.common.utils.SagaTopic;
 import io.choerodon.iam.infra.dataobject.SystemSettingDO;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 /**
  * @author zmf
@@ -32,7 +34,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     private final SystemSettingRepository systemSettingRepository;
     private final SagaClient sagaClient;
     private final ObjectMapper objectMapper;
-    private final String ERROR_UPDATE_SYSTEM_SETTING_EVENT_SEND = "error.system.setting.update.send.event";
+    private static final String ERROR_UPDATE_SYSTEM_SETTING_EVENT_SEND = "error.system.setting.update.send.event";
 
     @Autowired
     public SystemSettingServiceImpl(FileFeignClient fileFeignClient, SystemSettingRepository systemSettingRepository, SagaClient sagaClient) {
@@ -43,13 +45,19 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     }
 
     @Override
-    public String uploadFavicon(MultipartFile file) {
+    public String uploadFavicon(MultipartFile file, Double rotate, Integer axisX, Integer axisY, Integer width, Integer height) {
+        try {
+            file = ImageUtils.cutImage(file, rotate, axisX, axisY, width, height);
+        } catch (IOException e) {
+            throw new CommonException("error.image.cut");
+        }
         return uploadFile(file);
     }
 
     @Override
-    public String uploadSystemLogo(MultipartFile file) {
+    public String uploadSystemLogo(MultipartFile file, Double rotate, Integer axisX, Integer axisY, Integer width, Integer height) {
         try {
+            file = ImageUtils.cutImage(file, rotate, axisX, axisY, width, height);
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             Thumbnails.of(file.getInputStream()).forceSize(80, 80).toOutputStream(outputStream);
             file = new MockMultipartFile(file.getName(), file.getOriginalFilename(), file.getContentType(), outputStream.toByteArray());
@@ -61,6 +69,9 @@ public class SystemSettingServiceImpl implements SystemSettingService {
 
     @Override
     public SystemSettingDTO addSetting(SystemSettingDTO systemSettingDTO) {
+        addDefaultLengthValue(systemSettingDTO);
+        validateLength(systemSettingDTO);
+
         // 执行业务代码
         SystemSettingDTO dto = systemSettingRepository.addSetting(convert(systemSettingDTO));
 
@@ -72,6 +83,9 @@ public class SystemSettingServiceImpl implements SystemSettingService {
 
     @Override
     public SystemSettingDTO updateSetting(SystemSettingDTO systemSettingDTO) {
+        addDefaultLengthValue(systemSettingDTO);
+        validateLength(systemSettingDTO);
+
         // 执行业务代码
         SystemSettingDTO dto = systemSettingRepository.updateSetting(convert(systemSettingDTO));
 
@@ -122,5 +136,30 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         SystemSettingDO systemSettingDO = new SystemSettingDO();
         BeanUtils.copyProperties(systemSettingDTO, systemSettingDO);
         return systemSettingDO;
+    }
+
+    /**
+     * If the value is empty, default value is to be set.
+     *
+     * @param systemSettingDTO the dto
+     */
+    private void addDefaultLengthValue(SystemSettingDTO systemSettingDTO) {
+        if (systemSettingDTO.getMinPasswordLength() == null) {
+            systemSettingDTO.setMinPasswordLength(0);
+        }
+        if (systemSettingDTO.getMaxPasswordLength() == null) {
+            systemSettingDTO.setMaxPasswordLength(65535);
+        }
+    }
+
+    /**
+     * validate the value of min length and max length
+     *
+     * @param systemSettingDTO dto
+     */
+    private void validateLength(SystemSettingDTO systemSettingDTO) {
+        if (systemSettingDTO.getMinPasswordLength() > systemSettingDTO.getMaxPasswordLength()) {
+            throw new CommonException("error.maxLength.lessThan.minLength");
+        }
     }
 }

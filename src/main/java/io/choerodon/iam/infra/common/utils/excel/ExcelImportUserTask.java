@@ -2,7 +2,10 @@ package io.choerodon.iam.infra.common.utils.excel;
 
 import io.choerodon.core.excel.ExcelExportHelper;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.iam.api.dto.*;
+import io.choerodon.iam.api.dto.ErrorUserDTO;
+import io.choerodon.iam.api.dto.ExcelMemberRoleDTO;
+import io.choerodon.iam.api.dto.UserDTO;
+import io.choerodon.iam.api.validator.UserPasswordValidator;
 import io.choerodon.iam.app.service.OrganizationUserService;
 import io.choerodon.iam.domain.repository.MemberRoleRepository;
 import io.choerodon.iam.domain.repository.RoleRepository;
@@ -17,8 +20,6 @@ import io.choerodon.iam.infra.dataobject.RoleDO;
 import io.choerodon.iam.infra.dataobject.UploadHistoryDO;
 import io.choerodon.iam.infra.dataobject.UserDO;
 import io.choerodon.iam.infra.feign.FileFeignClient;
-import io.choerodon.iam.infra.feign.NotifyFeignClient;
-
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,10 +55,11 @@ public class ExcelImportUserTask {
     private OrganizationUserService organizationUserService;
     private FileFeignClient fileFeignClient;
     private IUserService iUserService;
+    private UserPasswordValidator userPasswordValidator;
     private final BCryptPasswordEncoder ENCODER = new BCryptPasswordEncoder();
 
 
-    public ExcelImportUserTask(UserRepository userRepository, RoleRepository roleRepository, MemberRoleRepository memberRoleRepository, IRoleMemberService iRoleMemberService, OrganizationUserService organizationUserService, FileFeignClient fileFeignClient, IUserService iUserService) {
+    public ExcelImportUserTask(UserRepository userRepository, RoleRepository roleRepository, MemberRoleRepository memberRoleRepository, IRoleMemberService iRoleMemberService, OrganizationUserService organizationUserService, FileFeignClient fileFeignClient, IUserService iUserService, UserPasswordValidator userPasswordValidator) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.memberRoleRepository = memberRoleRepository;
@@ -65,6 +67,7 @@ public class ExcelImportUserTask {
         this.organizationUserService = organizationUserService;
         this.fileFeignClient = fileFeignClient;
         this.iUserService = iUserService;
+        this.userPasswordValidator = userPasswordValidator;
     }
 
     @Async("excel-executor")
@@ -283,22 +286,16 @@ public class ExcelImportUserTask {
                     emailExisted = true;
                 }
                 if (loginNameExisted && emailExisted) {
-                    ErrorUserDTO dto = new ErrorUserDTO();
-                    BeanUtils.copyProperties(user, dto);
+                    ErrorUserDTO dto = getErrorUserDTO(user, "邮箱和登录名都已存在");
                     dto.setPassword(user.getOriginalPassword());
-                    dto.setCause("邮箱和登录名都已存在");
                     errorUsers.add(dto);
                 } else if (!loginNameExisted && emailExisted) {
-                    ErrorUserDTO dto = new ErrorUserDTO();
-                    BeanUtils.copyProperties(user, dto);
+                    ErrorUserDTO dto = getErrorUserDTO(user, "邮箱已存在");
                     dto.setPassword(user.getOriginalPassword());
-                    dto.setCause("邮箱已存在");
                     errorUsers.add(dto);
                 } else if (loginNameExisted && !emailExisted) {
-                    ErrorUserDTO dto = new ErrorUserDTO();
-                    BeanUtils.copyProperties(user, dto);
+                    ErrorUserDTO dto = getErrorUserDTO(user, "登录名已存在");
                     dto.setPassword(user.getOriginalPassword());
-                    dto.setCause("登录名已存在");
                     errorUsers.add(dto);
                 } else {
                     insertList.add(user);
@@ -322,9 +319,7 @@ public class ExcelImportUserTask {
                 for (UserDO user : list) {
                     String email = user.getEmail();
                     if (emailMap.get(email).size() > 1) {
-                        ErrorUserDTO dto = new ErrorUserDTO();
-                        BeanUtils.copyProperties(user, dto);
-                        dto.setCause("Excel中存在重复的登录名和密码");
+                        ErrorUserDTO dto = getErrorUserDTO(user, "Excel中存在重复的登录名和密码");
                         errorUsers.add(dto);
                     } else {
                         distinct.add(user);
@@ -350,9 +345,7 @@ public class ExcelImportUserTask {
             distinctNameList.add(list.get(0));
             if (list.size() > 1) {
                 for (int i = 1; i < list.size(); i++) {
-                    ErrorUserDTO dto = new ErrorUserDTO();
-                    BeanUtils.copyProperties(list.get(i), dto);
-                    dto.setCause("Excel中存在重复的登录名");
+                    ErrorUserDTO dto = getErrorUserDTO(list.get(i), "Excel中存在重复的登录名");
                     errorUsers.add(dto);
                 }
             }
@@ -369,9 +362,7 @@ public class ExcelImportUserTask {
             returnList.add(list.get(0));
             if (list.size() > 1) {
                 for (int i = 1; i < list.size(); i++) {
-                    ErrorUserDTO dto = new ErrorUserDTO();
-                    BeanUtils.copyProperties(list.get(i), dto);
-                    dto.setCause("Excel中存在重复的邮箱");
+                    ErrorUserDTO dto = getErrorUserDTO(list.get(i), "Excel中存在重复的邮箱");
                     errorUsers.add(dto);
                 }
             }
@@ -400,9 +391,7 @@ public class ExcelImportUserTask {
             distinctNameAndEmail.add(list.get(0));
             if (list.size() > 1) {
                 for (int i = 1; i < list.size(); i++) {
-                    ErrorUserDTO dto = new ErrorUserDTO();
-                    BeanUtils.copyProperties(list.get(i), dto);
-                    dto.setCause("Excel中存在重复的登录名和邮箱");
+                    ErrorUserDTO dto = getErrorUserDTO(list.get(i), "Excel中存在重复的登录名和邮箱");
                     errorUsers.add(dto);
                 }
             }
@@ -499,46 +488,60 @@ public class ExcelImportUserTask {
         Boolean ok = false;
         if (StringUtils.isEmpty(loginName) || StringUtils.isEmpty(email)) {
             //乐观认为大多数是正确的，所以new 对象放到了if 里面
-            ErrorUserDTO errorUser = new ErrorUserDTO();
-            BeanUtils.copyProperties(user, errorUser);
-            errorUser.setCause("登录名或邮箱为空");
+            ErrorUserDTO errorUser = getErrorUserDTO(user, "登录名或邮箱为空");
             errorUsers.add(errorUser);
         } else if (!Pattern.matches(UserDTO.EMAIL_REG, loginName)) {
-            ErrorUserDTO errorUser = new ErrorUserDTO();
-            BeanUtils.copyProperties(user, errorUser);
-            errorUser.setCause("登录名必须为邮箱格式");
+            ErrorUserDTO errorUser = getErrorUserDTO(user, "登录名必须为邮箱格式");
             errorUsers.add(errorUser);
         } else if (!Pattern.matches(UserDTO.EMAIL_REG, email)) {
-            ErrorUserDTO errorUser = new ErrorUserDTO();
-            BeanUtils.copyProperties(user, errorUser);
-            errorUser.setCause("非法的邮箱格式");
+            ErrorUserDTO errorUser = getErrorUserDTO(user, "非法的邮箱格式");
             errorUsers.add(errorUser);
         } else if (!StringUtils.isEmpty(realName) && realName.length() > 32) {
-            ErrorUserDTO errorUser = new ErrorUserDTO();
-            BeanUtils.copyProperties(user, errorUser);
-            errorUser.setCause("用户名超过32位");
+            ErrorUserDTO errorUser = getErrorUserDTO(user, "用户名超过32位");
             errorUsers.add(errorUser);
         } else if (!StringUtils.isEmpty(phone) && !Pattern.matches(UserDTO.PHONE_REG, phone)) {
+            ErrorUserDTO errorUser = getErrorUserDTO(user, "手机号格式不正确");
+            errorUsers.add(errorUser);
+        } else if (!userPasswordValidator.validate(user.getPassword(), user.getOrganizationId(), false)) {
             ErrorUserDTO errorUser = new ErrorUserDTO();
             BeanUtils.copyProperties(user, errorUser);
-            errorUser.setCause("手机号格式不正确");
+            String cause = "用户密码长度不符合系统设置中的范围";
+            // 为了获取报错的密码长度，再进行一次校验，从Exception中拿到报错信息，乐观认为犯错是少数，所以这样处理
+            try {
+                userPasswordValidator.validate(user.getPassword(), user.getOrganizationId(), true);
+            } catch (CommonException c) {
+                if (c.getParameters().length >= 2)
+                cause += "，长度应为" + c.getParameters()[0] + "-" + c.getParameters()[1];
+            }
+            errorUser.setCause(cause);
             errorUsers.add(errorUser);
         } else {
             ok = true;
-            user.setLoginName(user.getLoginName().trim());
-            if (!StringUtils.isEmpty(user.getRealName())) {
-                user.setRealName(user.getRealName().trim());
-            }
-            user.setEmail(user.getEmail().trim());
-            if (!StringUtils.isEmpty(user.getPhone())) {
-                user.setPhone(user.getPhone().trim());
-            }
-            if (!StringUtils.isEmpty(user.getPassword())) {
-                user.setPassword(user.getPassword().trim());
-            }
+            setUserField(user);
             insertUsers.add(user);
         }
         return ok;
+    }
+
+    private void setUserField(UserDO user) {
+        user.setLoginName(user.getLoginName().trim());
+        if (!StringUtils.isEmpty(user.getRealName())) {
+            user.setRealName(user.getRealName().trim());
+        }
+        user.setEmail(user.getEmail().trim());
+        if (!StringUtils.isEmpty(user.getPhone())) {
+            user.setPhone(user.getPhone().trim());
+        }
+        if (!StringUtils.isEmpty(user.getPassword())) {
+            user.setPassword(user.getPassword().trim());
+        }
+    }
+
+    private ErrorUserDTO getErrorUserDTO(final UserDO user, final String cause) {
+        ErrorUserDTO errorUser = new ErrorUserDTO();
+        BeanUtils.copyProperties(user, errorUser);
+        errorUser.setCause(cause);
+        return errorUser;
     }
 
 

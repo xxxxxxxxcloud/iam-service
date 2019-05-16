@@ -32,6 +32,10 @@ public class UserDTO {
     @ApiModelProperty(value = "组织名称/非必填")
     private String organizationName;
 
+    // 只用于返回该数据，不读入
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String organizationCode;
+
     @ApiModelProperty(value = "登录名/必填")
     @Pattern(regexp = EMAIL_REG, message = "error.user.loginName.regex",
             groups = {UserValidator.UserGroup.class, UserValidator.UserInfoGroup.class})
@@ -54,6 +58,9 @@ public class UserDTO {
     @Pattern(regexp = PHONE_REG, message = "error.phone.illegal",
             groups = {UserValidator.UserGroup.class, UserValidator.UserInfoGroup.class})
     private String phone;
+
+    @ApiModelProperty(value = "国际电话区号/非必填")
+    private String internationalTelCode;
 
     @ApiModelProperty(value = "头像/非必填")
     private String imageUrl;
@@ -222,12 +229,28 @@ public class UserDTO {
         }
     }
 
+    public String getInternationalTelCode() {
+        return internationalTelCode;
+    }
+
+    public void setInternationalTelCode(String internationalTelCode) {
+        this.internationalTelCode = internationalTelCode;
+    }
+
     public String getPassword() {
         return password;
     }
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getOrganizationCode() {
+        return organizationCode;
+    }
+
+    public void setOrganizationCode(String organizationCode) {
+        this.organizationCode = organizationCode;
     }
 
 }

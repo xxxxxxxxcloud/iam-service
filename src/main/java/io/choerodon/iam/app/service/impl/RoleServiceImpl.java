@@ -7,7 +7,6 @@ import io.choerodon.core.exception.CommonException;
 import io.choerodon.core.iam.ResourceLevel;
 import io.choerodon.iam.api.dto.*;
 import io.choerodon.iam.app.service.RoleService;
-import io.choerodon.iam.domain.iam.entity.PermissionE;
 import io.choerodon.iam.domain.iam.entity.RoleE;
 import io.choerodon.iam.domain.repository.*;
 import io.choerodon.iam.domain.service.IRoleService;
@@ -79,7 +78,7 @@ public class RoleServiceImpl implements RoleService {
         return roleDTOPage;
     }
 
-    @Transactional(rollbackFor = CommonException.class)
+
     @Override
     public RoleDTO create(RoleDTO roleDTO) {
         return ConvertHelper.convert(
@@ -94,14 +93,12 @@ public class RoleServiceImpl implements RoleService {
         }
         List<PermissionDTO> permissionDTOS = new ArrayList<>();
         if (!roleIds.isEmpty()) {
-            List<Long> permissionIds = rolePermissionRepository.queryPermissionIdsByRoles(roleIds);
-            for (Long id : permissionIds) {
-                PermissionE permissionE = permissionRepository.selectByPrimaryKey(id);
-                PermissionDTO permissionDTO = ConvertHelper.convert(permissionE, PermissionDTO.class);
-                if (permissionDTO != null) {
-                    permissionDTOS.add(permissionDTO);
-                }
-            }
+            List<Long> permissionIds = rolePermissionRepository.queryExistingPermissionIdsByRoleIds(roleIds);
+            permissionDTOS = permissionIds.parallelStream().map(id -> {
+                PermissionDTO permissionDTO = new PermissionDTO();
+                permissionDTO.setId(id);
+                return permissionDTO;
+            }).collect(Collectors.toList());
         }
         roleDTO.setPermissions(permissionDTOS);
         return create(roleDTO);
@@ -255,5 +252,12 @@ public class RoleServiceImpl implements RoleService {
     public List<RoleDTO> listRolesBySourceIdAndTypeAndUserId(String sourceType, Long sourceId, Long userId) {
         return ConvertHelper.convertList(
                 roleRepository.selectUsersRolesBySourceIdAndType(sourceType, sourceId, userId), RoleDTO.class);
+    }
+
+    @Override
+    public RoleDTO queryByCode(String code) {
+        RoleDO roleDO = new RoleDO();
+        roleDO.setCode(code);
+        return ConvertHelper.convert(roleRepository.selectOne(roleDO), RoleDTO.class);
     }
 }

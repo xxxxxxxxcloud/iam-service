@@ -2,15 +2,11 @@ package io.choerodon.iam.app.service.impl;
 
 import static io.choerodon.iam.infra.common.utils.SagaTopic.User.USER_UPDATE;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.coobird.thumbnailator.Thumbnails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
@@ -34,6 +30,7 @@ import io.choerodon.core.oauth.DetailsHelper;
 import io.choerodon.iam.api.dto.*;
 import io.choerodon.iam.api.dto.payload.UserEventPayload;
 import io.choerodon.iam.api.validator.ResourceLevelValidator;
+import io.choerodon.iam.api.validator.UserPasswordValidator;
 import io.choerodon.iam.app.service.UserService;
 import io.choerodon.iam.domain.iam.entity.UserE;
 import io.choerodon.iam.domain.repository.OrganizationRepository;
@@ -41,7 +38,7 @@ import io.choerodon.iam.domain.repository.ProjectRepository;
 import io.choerodon.iam.domain.repository.RoleRepository;
 import io.choerodon.iam.domain.repository.UserRepository;
 import io.choerodon.iam.domain.service.IUserService;
-import io.choerodon.iam.infra.common.utils.MockMultipartFile;
+import io.choerodon.iam.infra.common.utils.ImageUtils;
 import io.choerodon.iam.infra.dataobject.*;
 import io.choerodon.iam.infra.feign.FileFeignClient;
 import io.choerodon.iam.infra.mapper.MemberRoleMapper;
@@ -77,6 +74,7 @@ public class UserServiceImpl implements UserService {
     private FileFeignClient fileFeignClient;
     private BasePasswordPolicyMapper basePasswordPolicyMapper;
     private PasswordPolicyManager passwordPolicyManager;
+    private UserPasswordValidator userPasswordValidator;
     private RoleRepository roleRepository;
     private SagaClient sagaClient;
     private MemberRoleMapper memberRoleMapper;
@@ -90,6 +88,7 @@ public class UserServiceImpl implements UserService {
                            FileFeignClient fileFeignClient,
                            SagaClient sagaClient,
                            BasePasswordPolicyMapper basePasswordPolicyMapper,
+                           UserPasswordValidator userPasswordValidator,
                            PasswordPolicyManager passwordPolicyManager,
                            RoleRepository roleRepository,
                            MemberRoleMapper memberRoleMapper) {
@@ -102,6 +101,7 @@ public class UserServiceImpl implements UserService {
         this.sagaClient = sagaClient;
         this.basePasswordPolicyMapper = basePasswordPolicyMapper;
         this.passwordPolicyManager = passwordPolicyManager;
+        this.userPasswordValidator = userPasswordValidator;
         this.roleRepository = roleRepository;
         this.memberRoleMapper = memberRoleMapper;
     }
@@ -117,6 +117,10 @@ public class UserServiceImpl implements UserService {
         if (userDTO != null && userDTO.getOrganizationId() != null) {
             OrganizationDO organizationDO = organizationRepository.selectByPrimaryKey(userDTO.getOrganizationId());
             userDTO.setOrganizationName(organizationDO.getName());
+            userDTO.setOrganizationCode(organizationDO.getCode());
+            if (userDTO.getPhone() == null || userDTO.getPhone().isEmpty()) {
+                userDTO.setInternationalTelCode("");
+            }
         }
         return userDTO;
     }
@@ -199,17 +203,17 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public Page<UserDTO> pagingQueryUsersByRoleIdOnSiteLevel(PageRequest pageRequest, RoleAssignmentSearchDTO roleAssignmentSearchDTO, Long roleId) {
+    public Page<UserDTO> pagingQueryUsersByRoleIdOnSiteLevel(PageRequest pageRequest, RoleAssignmentSearchDTO roleAssignmentSearchDTO, Long roleId, boolean doPage) {
         return ConvertPageHelper.convertPage(
                 userRepository.pagingQueryUsersByRoleIdAndLevel(
-                        pageRequest, roleAssignmentSearchDTO, roleId, 0L, ResourceLevel.SITE.value(), true), UserDTO.class);
+                        pageRequest, roleAssignmentSearchDTO, roleId, 0L, ResourceLevel.SITE.value(), doPage), UserDTO.class);
     }
 
     @Override
-    public Page<UserDTO> pagingQueryUsersByRoleIdOnOrganizationLevel(PageRequest pageRequest, RoleAssignmentSearchDTO roleAssignmentSearchDTO, Long roleId, Long sourceId) {
+    public Page<UserDTO> pagingQueryUsersByRoleIdOnOrganizationLevel(PageRequest pageRequest, RoleAssignmentSearchDTO roleAssignmentSearchDTO, Long roleId, Long sourceId, boolean doPage) {
         return ConvertPageHelper.convertPage(
                 userRepository.pagingQueryUsersByRoleIdAndLevel(
-                        pageRequest, roleAssignmentSearchDTO, roleId, sourceId, ResourceLevel.ORGANIZATION.value(), true), UserDTO.class);
+                        pageRequest, roleAssignmentSearchDTO, roleId, sourceId, ResourceLevel.ORGANIZATION.value(), doPage), UserDTO.class);
     }
 
     @Override
@@ -230,23 +234,7 @@ public class UserServiceImpl implements UserService {
     public String savePhoto(Long id, MultipartFile file, Double rotate, Integer axisX, Integer axisY, Integer width, Integer height) {
         checkLoginUser(id);
         try {
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            if (rotate != null) {
-                Thumbnails.of(file.getInputStream()).scale(1.0, 1.0).rotate(rotate).toOutputStream(outputStream);
-            }
-            if (axisX != null && axisY != null && width != null && height != null) {
-                if (outputStream.size() > 0) {
-                    final InputStream rotateInputStream = parse(outputStream);
-                    outputStream.reset();
-                    Thumbnails.of(rotateInputStream).scale(1.0, 1.0).sourceRegion(axisX, axisY, width, height).toOutputStream(outputStream);
-                } else {
-                    Thumbnails.of(file.getInputStream()).scale(1.0, 1.0).sourceRegion(axisX, axisY, width, height).toOutputStream(outputStream);
-                }
-            }
-            if (outputStream.size() > 0) {
-                file = new MockMultipartFile(file.getName(), file.getOriginalFilename(),
-                        file.getContentType(), outputStream.toByteArray());
-            }
+            file = ImageUtils.cutImage(file, rotate, axisX, axisY, width, height);
             String photoUrl = fileFeignClient.uploadFile("iam-service", file.getOriginalFilename(), file).getBody();
             userRepository.updatePhoto(id, photoUrl);
             return photoUrl;
@@ -255,11 +243,6 @@ public class UserServiceImpl implements UserService {
             throw new CommonException("error.user.photo.save");
         }
     }
-
-    private ByteArrayInputStream parse(ByteArrayOutputStream out) {
-        return new ByteArrayInputStream(out.toByteArray());
-    }
-
 
     @Override
     public List<OrganizationDTO> queryOrganizationWithProjects() {
@@ -299,12 +282,14 @@ public class UserServiceImpl implements UserService {
             BeanUtils.copyProperties(user, baseUserDO);
             OrganizationDO organizationDO = organizationRepository.selectByPrimaryKey(user.getOrganizationId());
             if (organizationDO != null) {
-                BasePasswordPolicyDO basePasswordPolicyDO =
-                        basePasswordPolicyMapper.selectByPrimaryKey(
-                                basePasswordPolicyMapper.findByOrgId(organizationDO.getId()));
+                BasePasswordPolicyDO example = new BasePasswordPolicyDO();
+                example.setOrganizationId(organizationDO.getId());
+                BasePasswordPolicyDO basePasswordPolicyDO = basePasswordPolicyMapper.selectOne(example);
                 if (userPasswordDTO.getPassword() != null) {
                     passwordPolicyManager.passwordValidate(userPasswordDTO.getPassword(), baseUserDO, basePasswordPolicyDO);
                 }
+                // 校验用户密码
+                userPasswordValidator.validate(userPasswordDTO.getPassword(), organizationDO.getId(), true);
             }
         }
         user.resetPassword(userPasswordDTO.getPassword());
@@ -312,7 +297,6 @@ public class UserServiceImpl implements UserService {
         passwordRecord.updatePassword(user.getId(), user.getPassword());
 
         // send siteMsg
-        //this.sendSiteMsg(user.getId(), user.getRealName());
         Map<String, Object> paramsMap = new HashMap<>();
         paramsMap.put("userName", user.getRealName());
         List<Long> userIds = new ArrayList<>();
@@ -351,6 +335,9 @@ public class UserServiceImpl implements UserService {
         } else {
             dto = ConvertHelper.convert(iUserService.updateUserInfo(userE), UserDTO.class);
         }
+        OrganizationDO organizationDO = organizationRepository.selectByPrimaryKey(dto.getOrganizationId());
+        dto.setOrganizationName(organizationDO.getName());
+        dto.setOrganizationCode(organizationDO.getCode());
         return dto;
     }
 
@@ -464,11 +451,20 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserDTO> listUsersByIds(Long[] ids) {
+    public List<UserDTO> listUsersByIds(Long[] ids, Boolean onlyEnabled) {
         if (ids.length == 0) {
             return new ArrayList<>();
         } else {
-            return ConvertHelper.convertList(userRepository.listUsersByIds(ids), UserDTO.class);
+            return ConvertHelper.convertList(userRepository.listUsersByIds(ids, onlyEnabled), UserDTO.class);
+        }
+    }
+
+    @Override
+    public List<UserDTO> listUsersByEmails(String[] emails) {
+        if (emails.length == 0) {
+            return new ArrayList<>();
+        } else {
+            return ConvertHelper.convertList(userRepository.listUsersByEmails(emails), UserDTO.class);
         }
     }
 
@@ -571,7 +567,9 @@ public class UserServiceImpl implements UserService {
         Long organizationId = user.getOrganizationId();
         BaseUserDO userDO = new BaseUserDO();
         BeanUtils.copyProperties(user, userDO);
-        Optional.ofNullable(basePasswordPolicyMapper.findByOrgId(organizationId))
+        BasePasswordPolicyDO example = new BasePasswordPolicyDO();
+        example.setOrganizationId(organizationId);
+        Optional.ofNullable(basePasswordPolicyMapper.selectOne(example))
                 .ifPresent(passwordPolicy -> {
                     if (!password.equals(passwordPolicy.getOriginalPassword())) {
                         passwordPolicyManager.passwordValidate(password, userDO, passwordPolicy);
@@ -659,5 +657,11 @@ public class UserServiceImpl implements UserService {
     @Override
     public Page<SimplifiedUserDTO> pagingQueryAllUser(PageRequest pageRequest, String param) {
         return userRepository.pagingAllUsersByParams(pageRequest, param);
+    }
+
+    @Override
+    public Page<UserDTO> pagingQueryUsersOnSiteLevel(Long userId, String email, PageRequest pageRequest, String param) {
+        return ConvertPageHelper.convertPage(
+                userRepository.pagingQueryUsersOnSiteLevel(userId, email, pageRequest, param), UserDTO.class);
     }
 }

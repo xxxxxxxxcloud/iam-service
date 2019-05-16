@@ -2,6 +2,7 @@ package io.choerodon.iam.app.service;
 
 import io.choerodon.core.domain.Page;
 import io.choerodon.iam.api.dto.OrganizationDTO;
+import io.choerodon.iam.api.dto.UserDTO;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 /**
@@ -25,4 +26,6 @@ public interface OrganizationService {
 
     void check(OrganizationDTO organization);
 
+    Page<UserDTO> pagingQueryUsersInOrganization(Long organizationId,
+                                                 Long userId, String email, PageRequest pageRequest, String param);
 }

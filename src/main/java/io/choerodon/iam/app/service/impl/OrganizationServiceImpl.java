@@ -7,6 +7,7 @@ import static io.choerodon.iam.infra.common.utils.SagaTopic.Organization.TASK_OR
 import java.util.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.choerodon.iam.api.dto.UserDTO;
 import io.choerodon.iam.api.dto.payload.OrganizationCreateEventPayload;
 import io.choerodon.iam.domain.iam.entity.OrganizationE;
 import io.choerodon.iam.domain.iam.entity.UserE;
@@ -201,7 +202,7 @@ public class OrganizationServiceImpl implements OrganizationService {
                 throw new CommonException("error.organizationService.enableOrDisable.event", e);
             }
             //给asgard发送禁用定时任务通知
-            asgardFeignClient.disable(organization.getId());
+            asgardFeignClient.disableOrg(organization.getId());
             // 给组织下所有用户发送通知
             List<Long> userIds = organizationRepository.listMemberIds(organization.getId());
             Map<String, Object> params = new HashMap<>();
@@ -223,6 +224,12 @@ public class OrganizationServiceImpl implements OrganizationService {
         } else {
             checkCode(organization);
         }
+    }
+
+    @Override
+    public Page<UserDTO> pagingQueryUsersInOrganization(Long organizationId, Long userId, String email, PageRequest pageRequest, String param) {
+        return ConvertPageHelper.convertPage(
+                userRepository.pagingQueryUsersByOrganizationId(organizationId, userId, email, pageRequest, param), UserDTO.class);
     }
 
     private void checkCode(OrganizationDTO organization) {

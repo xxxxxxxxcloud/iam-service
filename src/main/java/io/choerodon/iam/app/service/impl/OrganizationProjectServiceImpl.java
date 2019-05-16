@@ -6,7 +6,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.choerodon.iam.domain.service.IUserService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
@@ -31,12 +30,13 @@ import io.choerodon.iam.domain.iam.entity.MemberRoleE;
 import io.choerodon.iam.domain.iam.entity.ProjectE;
 import io.choerodon.iam.domain.iam.entity.UserE;
 import io.choerodon.iam.domain.repository.*;
-import io.choerodon.iam.domain.service.IProjectService;
+import io.choerodon.iam.domain.service.IUserService;
 import io.choerodon.iam.infra.dataobject.LabelDO;
 import io.choerodon.iam.infra.dataobject.OrganizationDO;
 import io.choerodon.iam.infra.dataobject.ProjectDO;
 import io.choerodon.iam.infra.dataobject.RoleDO;
 import io.choerodon.iam.infra.enums.RoleLabel;
+import io.choerodon.iam.infra.feign.AsgardFeignClient;
 import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 
 /**
@@ -47,6 +47,7 @@ import io.choerodon.mybatis.pagehelper.domain.PageRequest;
 @RefreshScope
 public class OrganizationProjectServiceImpl implements OrganizationProjectService {
     private static final String ORGANIZATION_NOT_EXIST_EXCEPTION = "error.organization.not.exist";
+    public static final String PROJECT = "project";
 
     @Value("${choerodon.devops.message:false}")
     private boolean devopsMessage;
@@ -60,8 +61,6 @@ public class OrganizationProjectServiceImpl implements OrganizationProjectServic
 
     private OrganizationRepository organizationRepository;
 
-    private IProjectService iProjectService;
-
     private RoleRepository roleRepository;
 
     private MemberRoleRepository memberRoleRepository;
@@ -72,33 +71,35 @@ public class OrganizationProjectServiceImpl implements OrganizationProjectServic
 
     private IUserService iUserService;
 
+    private AsgardFeignClient asgardFeignClient;
+
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     public OrganizationProjectServiceImpl(ProjectRepository projectRepository,
                                           UserRepository userRepository,
                                           OrganizationRepository organizationRepository,
-                                          IProjectService iProjectService,
                                           RoleRepository roleRepository,
                                           MemberRoleRepository memberRoleRepository,
                                           LabelRepository labelRepository,
                                           SagaClient sagaClient,
-                                          IUserService iUserService) {
+                                          IUserService iUserService,
+                                          AsgardFeignClient asgardFeignClient) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.organizationRepository = organizationRepository;
-        this.iProjectService = iProjectService;
         this.roleRepository = roleRepository;
         this.memberRoleRepository = memberRoleRepository;
         this.labelRepository = labelRepository;
         this.sagaClient = sagaClient;
         this.iUserService = iUserService;
+        this.asgardFeignClient = asgardFeignClient;
     }
 
     @Transactional
     @Override
     @Saga(code = PROJECT_CREATE, description = "iam创建项目", inputSchemaClass = ProjectEventPayload.class)
     public ProjectDTO createProject(ProjectDTO projectDTO) {
-
         if (projectDTO.getEnabled() == null) {
             projectDTO.setEnabled(true);
         }
@@ -130,7 +131,7 @@ public class OrganizationProjectServiceImpl implements OrganizationProjectServic
         projectEventMsg.setOrganizationName(organizationDO.getName());
         try {
             String input = mapper.writeValueAsString(projectEventMsg);
-            sagaClient.startSaga(PROJECT_CREATE, new StartInstanceDTO(input, "project", newProjectE.getId() + ""));
+            sagaClient.startSaga(PROJECT_CREATE, new StartInstanceDTO(input, PROJECT, newProjectE.getId() + "", ResourceLevel.ORGANIZATION.value(), newProjectE.getOrganizationId()));
         } catch (Exception e) {
             throw new CommonException("error.organizationProjectService.createProject.event", e);
         }
@@ -205,7 +206,7 @@ public class OrganizationProjectServiceImpl implements OrganizationProjectServic
             BeanUtils.copyProperties(newProjectE, dto);
             try {
                 String input = mapper.writeValueAsString(projectEventMsg);
-                sagaClient.startSaga(PROJECT_UPDATE, new StartInstanceDTO(input, "project", newProjectE.getId() + ""));
+                sagaClient.startSaga(PROJECT_UPDATE, new StartInstanceDTO(input, PROJECT, newProjectE.getId() + "", ResourceLevel.ORGANIZATION.value(), organizationId));
             } catch (Exception e) {
                 throw new CommonException("error.organizationProjectService.updateProject.event", e);
             }
@@ -238,10 +239,12 @@ public class OrganizationProjectServiceImpl implements OrganizationProjectServic
             //saga
             try {
                 String input = mapper.writeValueAsString(payload);
-                sagaClient.startSaga(consumerType, new StartInstanceDTO(input, "project", "" + payload.getProjectId()));
+                sagaClient.startSaga(consumerType, new StartInstanceDTO(input, PROJECT, "" + payload.getProjectId(), ResourceLevel.ORGANIZATION.value(), projectDO.getOrganizationId()));
             } catch (Exception e) {
                 throw new CommonException("error.organizationProjectService.enableOrDisableProject", e);
             }
+            //给asgard发送禁用定时任务通知
+            asgardFeignClient.disableProj(projectId);
             // 给项目下所有用户发送通知
             List<Long> userIds = projectRepository.listUserIds(projectId);
             Map<String, Object> params = new HashMap<>();
@@ -253,7 +256,6 @@ public class OrganizationProjectServiceImpl implements OrganizationProjectServic
             }
         } else {
             project = projectRepository.updateSelective(projectDO);
-            //project = iProjectService.updateProjectEnabled(projectId);
         }
         return project;
     }

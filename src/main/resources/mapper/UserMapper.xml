@@ -33,6 +33,19 @@
                  open="(" separator="," close=")">
             #{id}
         </foreach>
+        <if test="onlyEnabled == true">
+            AND is_enabled = 1
+        </if>
+    </select>
+
+    <select id="listUsersByEmails" resultMap="userDO">
+        SELECT * FROM iam_user
+        WHERE email IN
+        <foreach item="email" index="index" collection="emails"
+                 open="(" separator="," close=")">
+            #{email}
+        </foreach>
+        AND is_enabled = 1
     </select>
 
     <select id="fulltextSearch" resultMap="userDO">
@@ -47,7 +60,7 @@
             AND is_ldap = #{userDO.ldap}
         </if>
         <if test="userDO.realName != null">
-            AND real_name = #{userDO.realName}
+            AND real_name LIKE concat(concat('%',#{userDO.realName}),'%')
         </if>
         <if test="userDO.enabled != null">
             AND is_enabled = #{userDO.enabled}
@@ -397,6 +410,35 @@
         </if>
     </select>
 
+    <select id="selectUsersByLevelAndOptions" resultMap="userDO">
+        SELECT iam_user.*
+        FROM iam_user
+        JOIN
+        (
+        SELECT
+        DISTINCT member_id
+        FROM
+        iam_member_role
+        WHERE
+        source_id = #{sourceId}
+        AND source_type = #{sourceType}
+        AND member_type = 'user'
+        ) t
+        ON iam_user.id = t.member_id
+        WHERE 1=1
+        <if test="userId != null">
+            AND iam_user.id = #{userId}
+        </if>
+        <if test="email != null">
+            AND iam_user.email LIKE concat(concat('%',#{email}),'%')
+        </if>
+        <if test="param != null">
+            AND (
+            iam_user.login_name LIKE concat(concat('%',#{param}),'%') OR
+            iam_user.real_name LIKE concat(concat('%',#{param}),'%')
+            )
+        </if>
+    </select>
 
     <select id="selectAdminUserPage" resultMap="userDO">
         SELECT * FROM iam_user WHERE is_admin = 1
@@ -450,13 +492,15 @@
         <id property="id" column="id"/>
         <result property="loginName" column="login_name"/>
         <result property="realName" column="real_name"/>
+        <result property="imageUrl" column="image_url"/>
     </resultMap>
 
     <select id="selectAllUsersSimplifiedInfo" resultMap="simplifiedUserDTO">
         SELECT
         id,
         login_name,
-        real_name
+        real_name,
+        image_url
         FROM
         iam_user
         WHERE

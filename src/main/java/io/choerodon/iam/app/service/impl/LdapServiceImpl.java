@@ -2,8 +2,6 @@ package io.choerodon.iam.app.service.impl;
 
 import io.choerodon.core.convertor.ConvertHelper;
 import io.choerodon.core.exception.CommonException;
-import io.choerodon.core.ldap.Ldap;
-import io.choerodon.core.ldap.LdapUtil;
 import io.choerodon.iam.api.dto.LdapAccountDTO;
 import io.choerodon.iam.api.dto.LdapConnectionDTO;
 import io.choerodon.iam.api.dto.LdapDTO;
@@ -15,16 +13,16 @@ import io.choerodon.iam.domain.repository.LdapHistoryRepository;
 import io.choerodon.iam.domain.repository.LdapRepository;
 import io.choerodon.iam.domain.repository.OrganizationRepository;
 import io.choerodon.iam.domain.service.ILdapService;
+import io.choerodon.iam.domain.service.impl.ILdapServiceImpl;
 import io.choerodon.iam.infra.common.utils.ldap.LdapSyncUserTask;
 import io.choerodon.iam.infra.dataobject.LdapDO;
 
 import io.choerodon.iam.infra.dataobject.LdapHistoryDO;
-import org.springframework.beans.BeanUtils;
+import org.springframework.ldap.core.LdapTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
-import javax.naming.ldap.LdapContext;
 import java.util.Date;
+import java.util.Map;
 
 /**
  * @author wuguokai
@@ -112,44 +110,26 @@ public class LdapServiceImpl implements LdapService {
         ldap.setAccount(ldapAccount.getAccount());
         //todo ldap password 加密解密
         ldap.setPassword(ldapAccount.getPassword());
-        return iLdapService.testConnect(ldap);
+        return (LdapConnectionDTO) iLdapService.testConnect(ldap).get(ILdapServiceImpl.LDAP_CONNECTION_DTO);
     }
 
     @Override
     public void syncLdapUser(Long organizationId, Long id) {
         LdapDO ldap = validateLdap(organizationId, id);
-        LdapContext ldapContext = getLdapContext(ldap);
-        ldapSyncUserTask.syncLDAPUser(ldapContext, ldap, finishFallback);
-    }
-
-    @Override
-    public LdapContext getLdapContext(LdapDO ldapDO) {
-        //匿名用户
-        boolean anonymous = StringUtils.isEmpty(ldapDO.getAccount()) || StringUtils.isEmpty(ldapDO.getPassword());
-        LdapContext ldapContext = null;
-        LdapConnectionDTO ldapConnectionDTO = new LdapConnectionDTO();
-        Ldap ldap = new Ldap();
-        BeanUtils.copyProperties(ldapDO, ldap);
-        if (anonymous) {
-            //匿名用户只连接
-            ldapContext = LdapUtil.ldapConnect(ldap);
-            if (ldapContext == null) {
-                throw new CommonException("error.ldap.connect");
-            }
-            iLdapService.anonymousUserMatchAttributeTesting(ldapContext, ldapConnectionDTO, ldapDO);
-        } else {
-            //非匿名用户登陆
-            ldapContext = LdapUtil.authenticate(ldap);
-            if (ldapContext == null) {
-                throw new CommonException("error.ldap.connect");
-            }
-            //匹配属性
-            iLdapService.matchAttributeTesting(ldapContext, ldapConnectionDTO, ldapDO);
+        Map<String, Object> map = iLdapService.testConnect(ldap);
+        LdapConnectionDTO ldapConnectionDTO =
+                (LdapConnectionDTO) map.get(ILdapServiceImpl.LDAP_CONNECTION_DTO);
+        if (!ldapConnectionDTO.getCanConnectServer()) {
+            throw new CommonException("error.ldap.connect");
         }
-        if (ldapConnectionDTO.getMatchAttribute() != null && !ldapConnectionDTO.getMatchAttribute()) {
+        if (!ldapConnectionDTO.getCanLogin()) {
+            throw new CommonException("error.ldap.authenticate");
+        }
+        if (!ldapConnectionDTO.getMatchAttribute()) {
             throw new CommonException("error.ldap.attribute.match");
         }
-        return ldapContext;
+        LdapTemplate ldapTemplate = (LdapTemplate) map.get(ILdapServiceImpl.LDAP_TEMPLATE);
+        ldapSyncUserTask.syncLDAPUser(ldapTemplate, ldap, finishFallback);
     }
 
     @Override

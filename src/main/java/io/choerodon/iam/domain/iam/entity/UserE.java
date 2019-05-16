@@ -1,9 +1,9 @@
 package io.choerodon.iam.domain.iam.entity;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-
 import java.util.Date;
 import java.util.List;
+
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 /**
  * @author dongfan117@gmail.com
@@ -27,6 +27,8 @@ public class UserE {
     private String password;
 
     private String realName;
+
+    private String internationalTelCode;
 
     private String phone;
 
@@ -77,13 +79,18 @@ public class UserE {
         this.admin = admin;
     }
 
+    public UserE(Long id, String loginName) {
+        this.id = id;
+        this.loginName = loginName;
+    }
+
     public UserE(Long id, String loginName, String email, Long organizationId,
                  String password, String realName,
                  String phone, String imageUrl, String profilePhoto,
                  String language, String timeZone, Date lastPasswordUpdatedAt,
                  Date lastLoginAt, Boolean enabled, Boolean locked, Boolean ldap,
                  Date lockedUntilAt, Integer passwordAttempt,
-                 Long objectVersionNumber, Boolean admin) {
+                 Long objectVersionNumber, Boolean admin, String internationalTelCode) {
         this.id = id;
         this.loginName = loginName;
         this.email = email;
@@ -104,6 +111,7 @@ public class UserE {
         this.passwordAttempt = passwordAttempt;
         this.objectVersionNumber = objectVersionNumber;
         this.admin = admin;
+        this.internationalTelCode = internationalTelCode;
     }
 
     public Long getId() {
@@ -192,6 +200,14 @@ public class UserE {
 
     public void lockUtilAt(Date date) {
         this.lockedUntilAt = date;
+    }
+
+    public String getInternationalTelCode() {
+        return internationalTelCode;
+    }
+
+    public void setInternationalTelCode(String internationalTelCode) {
+        this.internationalTelCode = internationalTelCode;
     }
 
     public void encodePassword() {

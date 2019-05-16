@@ -1,12 +1,13 @@
 package io.choerodon.iam.app.service.impl
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.choerodon.asgard.saga.dto.StartInstanceDTO
 import io.choerodon.asgard.saga.feign.SagaClient
 import io.choerodon.core.convertor.ConvertHelper
 import io.choerodon.core.oauth.DetailsHelper
 import io.choerodon.iam.api.dto.UserDTO
+import io.choerodon.iam.api.validator.UserPasswordValidator
 import io.choerodon.iam.app.service.OrganizationUserService
+import io.choerodon.iam.app.service.SystemSettingService
 import io.choerodon.iam.domain.iam.entity.OrganizationE
 import io.choerodon.iam.domain.iam.entity.UserE
 import io.choerodon.iam.domain.repository.OrganizationRepository
@@ -15,6 +16,7 @@ import io.choerodon.iam.domain.service.IUserService
 import io.choerodon.iam.infra.common.utils.SpockUtils
 import io.choerodon.iam.infra.dataobject.OrganizationDO
 import io.choerodon.iam.infra.dataobject.UserDO
+import io.choerodon.iam.infra.feign.OauthTokenFeignClient
 import io.choerodon.oauth.core.password.PasswordPolicyManager
 import io.choerodon.oauth.core.password.mapper.BasePasswordPolicyMapper
 import io.choerodon.oauth.core.password.record.PasswordRecord
@@ -28,7 +30,6 @@ import org.spockframework.runtime.Sputnik
 import spock.lang.Specification
 
 import java.lang.reflect.Field
-
 /**
  * @author dengyouquan
  * */
@@ -43,14 +44,17 @@ class OrganizationUserServiceImplSpec extends Specification {
     private SagaClient sagaClient = Mock(SagaClient)
     private PasswordPolicyManager passwordPolicyManager = Mock(PasswordPolicyManager)
     private BasePasswordPolicyMapper basePasswordPolicyMapper = Mock(BasePasswordPolicyMapper)
+    private OauthTokenFeignClient oauthTokenFeignClient = Mock(OauthTokenFeignClient)
+    private UserPasswordValidator userPasswordValidator = Mock(UserPasswordValidator)
+    private SystemSettingService systemSettingService = Mock(SystemSettingService)
     private OrganizationUserService organizationUserService
     private Long userId
 
     def setup() {
         given: "构造organizationUserService"
         organizationUserService = new OrganizationUserServiceImpl(
-                organizationRepository, userRepository, passwordPolicyManager,
-                basePasswordPolicyMapper, iUserService, sagaClient)
+                organizationRepository, userRepository, passwordRecord, passwordPolicyManager,
+                basePasswordPolicyMapper, oauthTokenFeignClient, userPasswordValidator, iUserService, systemSettingService, sagaClient)
         Field field = organizationUserService.getClass().getDeclaredField("devopsMessage")
         field.setAccessible(true)
         field.set(organizationUserService, true)
