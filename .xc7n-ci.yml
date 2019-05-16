@@ -4,19 +4,19 @@ stages:
   - mvn-package
   - docker-build
 
-maven-test-branches:
-  stage: mvn-package
-  script:
-    - git_merge x-master
-    - mvn package -U -DskipTests=true -Dmaven.test.skip=true
-  only:
-    - branches
-  except:
-    - x-master
-    - x-tags
-    - x-develop
-    - /^x-feature-.*$/
-    - /^x-hotfix-.*$/
+#maven-test-branches:
+#  stage: mvn-package
+#  script:
+#    - git_merge x-master
+#    - mvn package -U -DskipTests=true -Dmaven.test.skip=true
+#  only:
+#    - branches
+#  except:
+#    - /^x-master-.*$/
+#    - x-tags
+#    - x-develop
+#    - /^x-feature-.*$/
+#    - /^x-hotfix-.*$/
 
 maven-test-build:
   stage: mvn-package
@@ -27,7 +27,7 @@ maven-test-build:
     - mkdir -p /cache/${CI_PROJECT_NAME}-${CI_PROJECT_ID}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
     - cp target/app.jar /cache/${CI_PROJECT_NAME}-${CI_PROJECT_ID}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/app.jar
   only:
-    - x-master
+    - /^x-master-.*$/
     - x-tags
     - x-develop
     - /^x-feature-.*$/
@@ -39,7 +39,7 @@ docker-build:
     - docker_build
     - chart_build
   only:
-    - x-master
+    - /^x-master-.*$/
     - x-tags
     - x-develop
     - /^x-feature-.*$/
